@@ -10,6 +10,6 @@ What won’t work (yet)
 2. Random individual job pages (single posting URLs). We currently expect board URLs.
 
 ### Instructions:
-npm install @netlify/functions
-npm install
-npx netlify dev
+- npm install @netlify/functions
+- npm install
+- npx netlify dev
