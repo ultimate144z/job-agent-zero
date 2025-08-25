@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Job Agent Zero (MVP)</title>
+  <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body>
+  <main>
+    <h1>Job Agent Zero</h1>
+
+    <form id="frm">
+      <div class="grid">
+        <label>
+          Keywords (comma-separated)
+          <input name="keywords" placeholder="data, python, pandas"/>
+        </label>
+        <label>
+          Locations (comma-separated)
+          <input name="locations" placeholder="Remote, Pakistan"/>
+        </label>
+        <label>
+          Remote?
+          <select name="remote">
+            <option value="">Any</option>
+            <option value="true">Remote</option>
+            <option value="false">Onsite/Hybrid</option>
+          </select>
+        </label>
+        <label>
+          Posted within (days)
+          <input name="postedWithinDays" type="number" min="1" placeholder="21"/>
+        </label>
+        
+        <!-- Add new filters -->
+        <label>
+          Max years experience
+          <input name="maxYearsExperience" type="number" min="0" placeholder="2"/>
+        </label>
+        <label>
+          Degree at most
+          <select name="degreeAtMost">
+            <option value="">Any</option>
+            <option value="none">No degree required</option>
+            <option value="bachelors">Bachelors</option>
+            <option value="masters">Masters</option>
+            <option value="phd">PhD</option>
+          </select>
+        </label>
+        <label>
+          Seniority level
+          <select name="seniorityInclude" multiple>
+            <option value="intern">Intern</option>
+            <option value="junior">Junior</option>
+            <option value="mid">Mid-level</option>
+            <option value="senior">Senior</option>
+            <option value="lead">Lead</option>
+            <option value="staff">Staff</option>
+            <option value="principal">Principal</option>
+          </select>
+        </label>
+      </div>
+
+      <details>
+        <summary>Sources (Greenhouse / Lever)</summary>
+        <div>
+          <p>Add board URLs (one per line). Examples:</p>
+          <code>https://boards.greenhouse.io/stripe</code><br/>
+          <code>https://jobs.lever.co/databricks</code>
+          <textarea id="sources" rows="6" placeholder="https://boards.greenhouse.io/stripe
+https://jobs.lever.co/databricks"></textarea>
+        </div>
+      </details>
+
+      <button type="submit">Search</button>
+    </form>
+
+    <section id="out"></section>
+  </main>
+
+<script>
+  const out = document.getElementById('out');
+  const frm = document.getElementById('frm');
+
+  function parseSources(text) {
+    const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    return lines.map(url => {
+      try {
+        const u = new URL(url);
+        if (u.hostname.includes('greenhouse')) return { type: 'greenhouse', url };
+        if (u.hostname.includes('lever.co'))   return { type: 'lever', url };
+        if (u.hostname.includes('ashbyhq.com')) return { type: 'ashby', url };
+
+        return null;
+      } catch { return null; }
+    }).filter(Boolean);
+  }
+
+  // helpers
+  const uniq = arr => Array.from(new Set(arr));
+  
+  function parseCSVToArrayLower(s) {
+    return uniq(String(s || '')
+      .split(',')
+      .map(x => x.trim())
+      .filter(Boolean)
+      .map(x => x.toLowerCase()));
+  }
+  
+  function parseCSVToArray(s) {
+    return uniq(String(s || '')
+      .split(',')
+      .map(x => x.trim())
+      .filter(Boolean));
+  }
+  
+  function numberOrNull(v) {
+    const s = (v ?? '').toString().trim();
+    if (s === '') return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  frm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    out.innerHTML = '<div class="loading">Searching…</div>';
+
+    const fd = new FormData(frm);
+
+    // lowercase keywords to align with backend matching
+    const keywords = parseCSVToArrayLower(fd.get('keywords'));
+    
+    // locations are matched as substrings; keep original case
+    const locations = parseCSVToArray(fd.get('locations'));
+    
+    const remoteStr = (fd.get('remote') || '').toString();
+    const postedWithinDays = numberOrNull(fd.get('postedWithinDays'));
+    const maxYearsExperience = numberOrNull(fd.get('maxYearsExperience'));
+    
+    // degree normalized to lowercase; empty -> null
+    const degreeAtMostRaw = (fd.get('degreeAtMost') || '').toString().trim().toLowerCase();
+    const degreeAtMost = degreeAtMostRaw === '' ? null : degreeAtMostRaw;
+    
+    // multi-select seniority -> array, lowercase, dedupe
+    const seniorityInclude = uniq((fd.getAll('seniorityInclude') || [])
+      .map(String)
+      .map(s => s.toLowerCase())
+      .filter(Boolean));
+
+    const sources = parseSources(document.getElementById('sources').value);
+
+    if (!sources.length) {
+      out.innerHTML = `<p class="warn">Please add at least one Greenhouse or Lever URL.</p>`;
+      return;
+    }
+
+    const payload = {
+      keywords,
+      locations,
+      postedWithinDays,
+      remote: remoteStr === '' ? null : remoteStr === 'true',
+      maxYearsExperience,
+      degreeAtMost,
+      seniorityInclude,
+      sources,
+      page: 1,
+      pageSize: 50
+    };
+
+    try {
+      const res = await fetch('/.netlify/functions/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      renderResults(data);
+    } catch (err) {
+      out.innerHTML = `<p class="error">Request failed: ${err}</p>`;
+    }
+  });
+
+  function renderResults(data) {
+    if (!data.ok) {
+      out.innerHTML = `<p class="error">${data.error || 'Unknown error'}</p>`;
+      return;
+    }
+    if (!data.jobs.length) {
+      out.innerHTML = `<p class="empty">No jobs found for these filters.</p>`;
+      return;
+    }
+    out.innerHTML = data.jobs.map(job => `
+      <article class="job">
+        <header>
+          <h3><a href="${job.url}" target="_blank" rel="noopener">${escapeHtml(job.title)}</a></h3>
+          <div class="meta">
+            <span>${escapeHtml(job.company)}</span> ·
+            <span>${escapeHtml(job.location || 'Unknown')}</span> ·
+            <span>${job.provider}</span>
+          </div>
+        </header>
+        ${(() => {
+          const badges = [];
+          if (job?.requirements?.minYears != null) badges.push(`${job.requirements.minYears}+ yrs`);
+          if (job?.requirements?.degree) badges.push(job.requirements.degree.toUpperCase());
+          if (job?.requirements?.seniority) badges.push(job.requirements.seniority);
+          return badges.length ? `<div class="badges">${badges.map(b=>`<span>${escapeHtml(b)}</span>`).join(' ')}</div>` : ``;
+        })()}
+        ${Array.isArray(job.summary) && job.summary.length ? `
+          <ul>${job.summary.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ul>
+        ` : `<p>No summary available.</p>`}
+      </article>
+    `).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+</script>
+
+</body>
+</html>

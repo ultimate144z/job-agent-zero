@@ -1,0 +1,36 @@
+:root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+body { margin: 0; background: #0b1020; color: #e7ebff; }
+main { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+h1 { margin-bottom: 16px; }
+form { background: #151a33; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 12px; }
+label { display: grid; gap: 6px; font-size: 0.95rem; }
+input, select, textarea, button {
+  width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #2a2f53;
+  background: #0f1430; color: #e7ebff;
+}
+select[multiple] {
+  height: 120px;
+  padding: 4px;
+}
+option {
+  padding: 4px 8px;
+}
+textarea { resize: vertical; }
+button { cursor: pointer; background: #2c6df3; border: none; }
+button:hover { filter: brightness(1.1); }
+.job { background: #151a33; padding: 12px 14px; border-radius: 8px; margin: 10px 0; }
+.job .meta { opacity: 0.8; font-size: 0.9rem; }
+
+.badges { margin: 6px 0 2px; display: flex; gap: 6px; flex-wrap: wrap; }
+.badges span { background:#20305f; padding:3px 6px; border-radius:999px; font-size:12px; }
+
+a { color: #8db0ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.loading, .warn, .error, .empty { padding: 10px; }
+.warn { background: #3b2e00; }
+.error { background: #3b000b; }
+.empty { background: #122; }
+code { background: #0f1430; padding: 2px 6px; border-radius: 4px; }
+details { margin: 10px 0; }
+summary { cursor: pointer; }

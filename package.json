@@ -1,0 +1,22 @@
+{
+  "name": "job-agent-zero",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo \"Static site only; Netlify builds functions from TS.\"",
+    "format": "prettier -w .",
+    "lint": "eslint . --ext .ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "eslint": "^9.10.0",
+    "netlify-cli": "^17.29.1",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@netlify/functions": "^4.2.2"
+  }
+}
